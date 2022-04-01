@@ -284,105 +284,123 @@ forall<T> {
 
 But apply that to `MyList<u32>`...
 
+* `MyList<u32>: Send`
 --
-* `MyList<u32>: Send` if...
 
+* `u32: Send` ✅
 --
-    * `u32: Send` ✅
+
+* `Option<Box<MyList<u32>>>: Send`
 --
-    * `Option<Box<MyList<T>>>: Send` if...
+
+* `Box<MyList<u32>>: Send`
 --
-        * `Box<MyList<T>>: Send` if...
---
-            * `MyList<T>: Send` ❌
+
+* `MyList<u32>: Send` ❌ cycle!
 
 ---
 
 * Start with **Horn clauses**, like Prolog
-* Blend in **Hereditary Harrop predicates**, like λProlog¹
+* Blend in **Hereditary Harrop predicates**, like λProlog
 * Add a dash of **coinduction**, a la CoLP², to taste
 
-Problem: Horn clauses can't express Rust WF goals.
+-------
 
-.footnote[² XXX]
+With CoLP, cycles of coinductive predicates are generally accepted. (We don't, however, need or want infinite terms.)
 
----
-
-## Goals
-
-```
-Goal = Predicate
-     | Relation
-     | All(Goal, ..., Goal)
-     | Any(Goal, ..., Goal)
-     | Clauses ⇒ Goal
-     | ∀X: Goal
-     | ∃X: Goal
-```
+.footnote[² "Coinductive Logic Programming" by Luke Simon et al.]
 
 ---
 
-## Clauses
+* Start with **Horn clauses**, like Prolog
+* Blend in **Hereditary Harrop predicates**, like λProlog
+* Add a dash of **coinduction**, a la CoLP, to taste
+
+-------
+
+Current solver uses co-SLD algorithm and solves goals with:
+
+* "builtin" operations (∧, ∨, ∀, ∃, ⇒) 
+* opaque **predicates**, defined by upper layers
+* **relations** like `T1 <: T2` or `T: R`, defined by upper layers
+
+Will eventually model Rust's actual solver.
+
+---
+
+# ~~Core logic~~
+
+# Rust types
+
+---
+
+# Rust types
+
+Defines:
+
+* Grammar of types, lifetimes, and where clauses
+* Subtyping rules
+
+---
+
+# Type grammar
+
+Generalized version of Rust types:
 
 ```
-Clause = Predicate
-       | Goals ⇒ Clause
-       | ∀X: Clause
+Type = RigidType < Parameter ... >
+     | ∀X:WhereClause. Type
+     | ∃X:WhereClause. Type
+     | X
+
+RigidType = StructName
+          | tuple/N
+          | fn/N
+          | ...
+
+Parameter = Type
+          | Lifetime
 ```
 
 ---
 
-## Solver
+# Rigid types
 
-Solve queries like
+Most Rust types are "rigid types":
 
-```
-∀X: ∃Y: (X == Y)
-```
-
-(True!)
-
-```
-∃Y: ∀X: (X == Y)
-```
-
-(False!)
+* a `Vec<T>` would just be `Vec<T>`
+* a fn pointer like `fn(u8)` would be `fn/1<u8, ()>`
+* a tuple like `(T, U)` would be `tuple/2<T, U)>`
 
 ---
 
-## Parameterized by...
+# ∀ types
 
-* 
+∀ types are used for higher-ranked functions and `dyn` values.
 
+* a type like `for<'a> fn(&'a u8)` would be `∀'a. fn/1<&'a u8, ()>`
 
-# Answers questions like
+---
 
+# ∃ types
+
+∃ types are used for higher-ranked functions and `dyn` values.
+
+* a type like `dyn Write` would be `∃T:Write. T`
+
+---
+
+# ~~Core logic~~
+
+# ~~Rust types~~
+
+# Rust declarations
+
+---
+
+# Rust declarations
 
 
 ---
 
-## Core logic
-
-
-
----
-
-## Closing: "types" team
-
-
----
-
-# Structured in several layers
-
-## Core logic
-
-Proving abstract predicates like
-
-* `(ForAll ((TyKind X)) (Exists ((TyKind Y)) (X == Y))`
-* `(Implies ((Implies P Q) P) Q)`
-
-Entirely independent from Rust
-
-Includes a "hook" to get program clauses from upper layers:
-
-* `(ForAll ((TyKind T)) (Implies (Implemented Copy (T)) (Implemented Copy (Vec (T))))`
+# Rust declarations
