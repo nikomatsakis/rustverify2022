@@ -38,10 +38,12 @@ Rust **raising the bar** on reliability for users:
 * Start off with the borrow checker.
 * Tooling that makes thorough testing easy and accessible.
     * Including detecting UB in unsafe code.
-* Ready for more? Add in some pre- and post-conditions, maybe test dynamically.
-* Not enough for ya? Try this model checker.
+* Ready for more? 
+    * Add in some pre- and post-conditions, maybe test dynamically.
+* Not enough for ya? 
+    * Try this model checker! I heard it's nice!
 
-Making the **fancy stuff** easy and accessible
+TL;DR? Rust: Making the **fancy stuff** easy and accessible!
 
 ---
 
@@ -90,21 +92,29 @@ Let's brainstorm about that picture I was painting and the best things we can do
 
 Or maybe you think this idea will never work?
 
+--
+
 ![Never tell me the odds](./images/never-tell-me-the-odds.gif)
+
+.footnote[(Yes, I just wanted to sneak in this GIF for some reason. Sue me.)]
 
 ---
 
 # What is "a MIR formality"?
 
-* PLT Redex model
+* PLT Redex¹ model
     * accessible, hackable, fun
 * May change later
+
+.footnote[¹ "Semantics Engineering with PLT Redex" by Felleisen et al. ]
 
 ---
 
 # Structured in several layers
 
-## Core logic
+* **Core logic**
+
+----------
 
 Proving abstract predicates like
 
@@ -117,9 +127,10 @@ Entirely independent from Rust
 
 # Structured in several layers
 
-## Core logic
+* Core logic
+* **Rust Types**
 
-## Rust Types
+----------
 
 Defining Rust types and their relationships to one another
 
@@ -129,9 +140,11 @@ e.g. `&'a u32 <: &'b u32` if `'a: 'b`
 
 # Structured in several layers
 
-## Core logic / Rust Types
+* Core logic
+* Rust Types
+* **Rust Declarations**
 
-## Rust Declarations
+----------
 
 Defines syntax for declarations of things, but no function bodies
 
@@ -150,19 +163,13 @@ Converting them into *clauses* and *well-formedness goals*:
 
 # Structured in several layers
 
-## Core logic / Rust Types / Rust Declarations
-
-## MIR Function Bodies
-
---
-
-## MIR Operational Semantics
-
---
-
-## ... probably some other stuff ...
-
-## Rust surface syntax?
+* Core logic
+* Rust Types
+* Rust Declarations
+* **MIR Function Bodies**
+* **MIR Operational Semantics**
+* **... probably some other stuff ...**
+* **Rust surface syntax**
 
 ---
 
@@ -174,6 +181,130 @@ Converting them into *clauses* and *well-formedness goals*:
 
 # Core logic
 
+---
+
+* Start with **Horn clauses**, like Prolog
+
+------
+
+```rust
+impl<T: Debug> Debug for Vec<T> { ... }
+```
+
+becomes
+
+```rust
+forall<T> {
+    HasImpl¹(Vec<T>: Debug) :-
+        Implemented(T: Debug)
+}
+```
+
+.footnote[¹ I will explain HasImpl vs Implemented, I promise!]
+
+---
+
+* Start with **Horn clauses**, like Prolog
+
+------
+
+**Problem:** Horn clauses are pretty limited. You can have a `forall` in a *clause*, for example, but not in a *goal*.
+
+Consider:
+
+```rust
+fn foo<T: Clone>(t: T) -> T {
+    t.clone()
+}
+```
+
+We want to prove this goal, but that's beyond Horn clauses
+
+```rust
+forall<T> {
+    if Implemented(T: Clone) {
+        Implemented(T: Clone)
+    }
+}
+```
+
+---
+
+* Start with **Horn clauses**, like Prolog
+* Blend in **Hereditary Harrop predicates**, like λProlog¹
+
+.footnote[¹ "Programming with Higher-Order Logic" by Dale Miller, Gopalan Nadathur]
+
+------
+
+Hederitary Harrop predicates permit goals with `forall` and `implication`, not just `exists`.
+
+We can now express generic functions in Rust.
+
+---
+
+* Start with **Horn clauses**, like Prolog
+* Blend in **Hereditary Harrop predicates**, like λProlog
+
+-------
+
+**Problem:** Cycles and auto traits like `Send`
+
+```rust
+struct MyList<T> {
+    data: T,
+    next: Option<Box<MyList<T>>>
+}
+```
+
+`MyList<X>` is `Send` if all of reachable data is `Send`. Most obvious formulation has one goal per field:
+
+```rust
+forall<T> {
+    Implemented(MyList<X>: Send) :-
+        Implemented(T: Send),
+        Implemented(Option<Box<MyList<T>>>: Send).
+}
+```
+
+---
+
+* Start with **Horn clauses**, like Prolog
+* Blend in **Hereditary Harrop predicates**, like λProlog
+
+-------
+
+```rust
+forall<T> {
+    Implemented(MyList<X>: Send) :-
+        Implemented(T: Send),
+        Implemented(Option<Box<MyList<T>>>: Send).
+}
+```
+
+But apply that to `MyList<u32>`...
+
+--
+* `MyList<u32>: Send` if...
+
+--
+    * `u32: Send` ✅
+--
+    * `Option<Box<MyList<T>>>: Send` if...
+--
+        * `Box<MyList<T>>: Send` if...
+--
+            * `MyList<T>: Send` ❌
+
+---
+
+* Start with **Horn clauses**, like Prolog
+* Blend in **Hereditary Harrop predicates**, like λProlog¹
+* Add a dash of **coinduction**, a la CoLP², to taste
+
+Problem: Horn clauses can't express Rust WF goals.
+
+.footnote[² XXX]
 
 ---
 
