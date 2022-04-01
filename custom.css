@@ -142,7 +142,7 @@ td pre {
 }
 
 .rust-means::before {
-  background-image: url("content/images/rust-logo-blk.svg");
+  background-image: url("images/rust-logo-blk.svg");
   background-size: 4rem 4rem;
   display: block;
   position: absolute;
