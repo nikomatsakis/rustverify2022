@@ -551,7 +551,35 @@ Defines:
 
 ---
 
+```rust
+(define-extended-language formality-ty formality-logic
+  ...
+
+  (Parameter ::= Ty Lt)
+  (Predicate ::=
+             (Implemented TraitRef)
+             (HasImpl TraitRef)
+             (WellFormed (ParameterKind Parameter))
+             )
+  (TraitRef ::= (TraitId (Parameter ...)))
+  (ParameterKind ::= TyKind LtKind)
+
+  ...
+  )
+```
+
+---
+
 # Rust types
+
+```racket
+(define-metafunction formality-ty
+  ty:relate-parameters : Env Relation -> (Env Goals) or Error
+
+  [(ty:relate-parameters Env Relation)
+   (relate/one (existential-vars-in-env Env) Env Relation)]
+  )
+```
 
 ---
 
@@ -574,15 +602,45 @@ Defines the semantics and type rules for most Rust items:
 
 ---
 
+name:formality-decl-grammar
+
+```rust
+(define-extended-language formality-decl formality-ty
+  (DeclProgram ::= (CrateDecls CrateId))
+  
+  (CrateDecls ::= (CrateDecl ...))
+  (CrateDecl ::= (CrateId CrateContents))
+  (CrateContents ::= (crate (CrateItemDecl ...)))
+  (CrateItemDecl ::= AdtDecl TraitDecl TraitImplDecl)
+
+  ...
+  )
+```
+
+---
+
+template:formality-decl-grammar
+
+.DeclProgramArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:formality-decl-grammar
+
+.CrateItemDeclArrow[![Arrow](./images/Arrow.png)]
+
+---
+
 # Rust declarations
 
-Given a set of crates, 
+Given a `DeclProgram`, two key tasks:
+
+* Create **program clauses** that define what is *true*
+* Create **wellformedness goals** that define what a legal Rust program is
 
 ---
 
 # Clauses
-
-Given a set of crates, creates the program clauses that define *what is true*.
 
 Predicates we use:
 
@@ -614,16 +672,17 @@ forall<T> {
 # Clauses from an impl
 
 ```rust
-impl<T: Eq> Eq for Vec<T> { }
+impl<T: Ord> Ord for BinaryTree<T> { }
 ```
 
 generates
 
 ```rust
 forall<T> {
-    HasImpl(Vec<T>: Eq) :-
-        WellFormed(Vec<T>: Eq),
-        Implemented(T: Eq)
+    HasImpl(BinaryTree<T>: Ord) :-
+        WellFormed(BinaryTree<T>),
+        Implemented(T: Ord),
+        Implemented(T: Sized)
 }
 ```
 
@@ -632,32 +691,158 @@ forall<T> {
 # Clauses from a trait
 
 ```rust
-trait Eq: PartialEq { }
+trait Ord: Eq¹ { }
 ```
 
 generates
 
 ```rust
 forall<T> {
-    Implemented(T: Eq) :-
-        HasImpl(T: Eq),
-        Implemented(T: PartialEq)
+    Implemented(T: Ord) :-
+        HasImpl(T: Ord),
+        Implemented(T: Eq)
 }
+```
+
+.footnote[¹ I've simplified Rust's trait hierachy here.]
+
+---
+
+# Putting it all together
+
+Given this program:
+
+```rust
+trait Ord: Eq { }
+trait Eq { }
+
+struct BinaryTree<T: Ord> { }
+impl<T: Ord> Ord for BinaryTree<T> { }
+impl<T: Ord> Eq for BinaryTree<T> { }
+
+impl Ord for u32 { }
+impl Eq for u32 { }
+```
+
+...can we prove `Implemented(BinaryTree<u32>: Ord)`?
+
+---
+
+# Proving 
+
+* `Implemented(BinaryTree<u32>: Ord)`
+
+.ProveImplementedArrow[![Arrow](./images/Arrow.png)]
+
+---------
+
+--
+
+Use clause 
+
+```
+forall<T> {
+    Implemented(T: Ord) :-
+        HasImpl(T: Ord),
+        Implemented(T: Eq)
+}
+```
+
+from 
+
+```rust
+trait Ord: Eq { }
 ```
 
 ---
 
-# Clauses from an impl
+# Proving 
 
-```rust
-impl<T: Eq> Eq for Vec<T> { }
+* `Implemented(BinaryTree<u32>: Ord)` holds if...
+    * `HasImpl(BinaryTree<u32>: Ord)`
+    * `Implemented(BinaryTree<u32>: Eq)`
+
+.ProveHasImplArrow[![Arrow](./images/Arrow.png)]
+
+---------
+
+--
+
+use clause 
+
 ```
-
-generates
-
-```rust
 forall<T> {
-    HasImpl(Vec<T>: Eq) :-
-        Implemented(T: Eq)
+    HasImpl(BinaryTree<T>: Ord) :-
+        WellFormed(BinaryTree<T>),
+        Implemented(T: Ord),
+        Implemented(T: Sized)
 }
 ```
+
+from `impl<T: Ord> Ord for BinaryTree<T> { }`
+
+
+---
+
+# Proving 
+
+* `Implemented(BinaryTree<u32>: Ord)` holds if...
+    * `HasImpl(BinaryTree<u32>: Ord)` holds if...
+        * `WellFormed(BinaryTree<u32>)`
+        * `Implemented(u32: Ord)`
+        * `Implemented(u32: Sized)`
+    * `Implemented(BinaryTree<u32>: Eq)`
+
+.ProveWellFormedArrow[![Arrow](./images/Arrow.png)]
+
+---------
+
+--
+
+Use clause from `struct BinaryTree<T: Ord>`...
+
+```
+forall<T> { WellFormed(BinaryTree<T>) :- WellFormed(T), 
+                                         Implemented(T: Ord),
+                                         Implemented(T: Sized) }
+```
+
+---
+
+# Proving 
+
+* `Implemented(BinaryTree<u32>: Ord)` holds if...
+    * `HasImpl(BinaryTree<u32>: Ord)` holds if...
+        * `WellFormed(BinaryTree<u32>)` holds if...
+            * `WellFormed(u32)`
+            * `Implemented(u32: Ord)`
+            * `Implemented(u32: Sized)`
+        * `Implemented(u32: Ord)`
+        * `Implemented(u32: Sized)`
+    * `Implemented(BinaryTree<u32>: Eq)`
+
+---
+
+# Proving 
+
+* `Implemented(BinaryTree<u32>: Ord)` holds if...
+    * `HasImpl(BinaryTree<u32>: Ord)` holds if...
+        * `WellFormed(BinaryTree<u32>)` holds if...
+            * `WellFormed(u32)` ✅ (builtin rule)
+            * `Implemented(u32: Ord)` ✅ (due to impl)
+            * `Implemented(u32: Sized)` ✅ (builtin rule)
+        * `Implemented(u32: Ord)`  ✅ (due to impl)
+        * `Implemented(u32: Sized)`  ✅ (due to impl)
+    * `Implemented(BinaryTree<u32>: Eq)` ...✅ (similar to above)
+
+---
+
+# Key takeaways
+
+* Traits define `Implemented` in terms of `HasImpl`
+* Impls define `HasImpl` in terms of `WellFormed`, `Implemented`
+* Structs define `WellFormed` in terms of `WellFormed`, `Implemented`
+* Builtin rules for `Sized`, scalars
+
+---
+

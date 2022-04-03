@@ -470,6 +470,46 @@ mark, .mark {
   transform: rotate(315deg);
 }
 
+.DeclProgramArrow img {
+  position: absolute;
+  top: 75px;
+  left: 35px;
+  width: 50px;
+  transform: rotate(315deg);
+}
+
+.CrateItemDeclArrow img {
+  position: absolute;
+  top: 215px;
+  left: 220px;
+  width: 50px;
+  transform: rotate(315deg);
+}
+
+.ProveImplementedArrow img {
+  position: absolute;
+  top: 115px;
+  left: 10px;
+  width: 50px;
+  transform: rotate(0deg);
+}
+
+.ProveHasImplArrow img {
+  position: absolute;
+  top: 153px;
+  left: 50px;
+  width: 50px;
+  transform: rotate(0deg);
+}
+
+.ProveWellFormedArrow img {
+  position: absolute;
+  top: 185px;
+  left: 90px;
+  width: 50px;
+  transform: rotate(0deg);
+}
+
 .col-right {
     position: absolute;
     top: 110px;
