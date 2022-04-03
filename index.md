@@ -1107,7 +1107,7 @@ Implemented(T: Ord) => Implemented(T: Eq)
 
 # Clauses + Invariants: How Formality models it
 
-Invariants are only used to elaborate **hypotheses** when proving an implication like `if H { G }`:
+Invariants are only used to elaborate **hypotheses** when proving an implication:
 
 ```rust
 if Implemented(T: Ord) {
