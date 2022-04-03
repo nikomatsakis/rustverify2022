@@ -78,11 +78,11 @@ That's where "a MIR formality" comes in.
 
 # What I'm hoping for from y'all
 
-Nitty gritty:
+**Nitty gritty:**
 
 I'd love to sit down with people and go over the specifics of what I've done so far. I'm here till Thursday.
 
-Bigger picture:
+**Bigger picture:**
 
 Let's brainstorm about that picture I was painting and the best things we can do to move it forward!
 
@@ -106,7 +106,7 @@ Or maybe you think this idea will never work?
     * accessible, hackable, fun
 * May change later
 
-.footnote[¹ "Semantics Engineering with PLT Redex" by Felleisen et al. ]
+.footnote[¹ "Semantics Engineering with PLT Redex" by Felleisen et al.]
 
 ---
 
@@ -175,7 +175,18 @@ Converting them into *clauses* and *well-formedness goals*:
 
 # Why these layers?
 
-* 
+* Each layer is simple on its own.
+* Syntax-directed translation from one to the next.
+* Clarify "how complex" of a change a given feature is.
+
+---
+
+# Which Rust?
+
+* Current goal: *Rust of the near future*
+* Eventually:
+    * Stable Rust
+    * Nightly Rust
 
 ---
 
@@ -653,10 +664,10 @@ Predicates we use:
 # Clauses from a struct
 
 ```rust
-struct BinaryTree<T: Ord> { }
+struct BinaryTree<T: Ord> { ... }
 ```
 
-generates
+generates the clause
 
 ```rust
 forall<T> {
@@ -672,10 +683,10 @@ forall<T> {
 # Clauses from an impl
 
 ```rust
-impl<T: Ord> Ord for BinaryTree<T> { }
+impl<T: Ord> Ord for BinaryTree<T> { ... }
 ```
 
-generates
+generates the clause
 
 ```rust
 forall<T> {
@@ -691,10 +702,10 @@ forall<T> {
 # Clauses from a trait
 
 ```rust
-trait Ord: Eq¹ { }
+trait Ord: Eq¹ { ... }
 ```
 
-generates
+generates the clause
 
 ```rust
 forall<T> {
@@ -713,22 +724,22 @@ forall<T> {
 Given this program:
 
 ```rust
-trait Ord: Eq { }
-trait Eq { }
+trait Ord: Eq { ... }
+trait Eq { ... }
 
-struct BinaryTree<T: Ord> { }
-impl<T: Ord> Ord for BinaryTree<T> { }
-impl<T: Ord> Eq for BinaryTree<T> { }
+struct BinaryTree<T: Ord> { ... }
+impl<T: Ord> Ord for BinaryTree<T> { ... }
+impl<T: Ord> Eq for BinaryTree<T> { ... }
 
-impl Ord for u32 { }
-impl Eq for u32 { }
+impl Ord for u32 { ... }
+impl Eq for u32 { .. }
 ```
 
 ...can we prove `Implemented(BinaryTree<u32>: Ord)`?
 
 ---
 
-# Proving 
+# Putting it all together
 
 * `Implemented(BinaryTree<u32>: Ord)`
 
@@ -751,12 +762,12 @@ forall<T> {
 from 
 
 ```rust
-trait Ord: Eq { }
+trait Ord: Eq { ... }
 ```
 
 ---
 
-# Proving 
+# Putting it all together
 
 * `Implemented(BinaryTree<u32>: Ord)` holds if...
     * `HasImpl(BinaryTree<u32>: Ord)`
@@ -779,12 +790,11 @@ forall<T> {
 }
 ```
 
-from `impl<T: Ord> Ord for BinaryTree<T> { }`
-
+from `impl<T: Ord> Ord for BinaryTree<T> { ... }`
 
 ---
 
-# Proving 
+# Putting it all together
 
 * `Implemented(BinaryTree<u32>: Ord)` holds if...
     * `HasImpl(BinaryTree<u32>: Ord)` holds if...
@@ -809,7 +819,7 @@ forall<T> { WellFormed(BinaryTree<T>) :- WellFormed(T),
 
 ---
 
-# Proving 
+# Putting it all together
 
 * `Implemented(BinaryTree<u32>: Ord)` holds if...
     * `HasImpl(BinaryTree<u32>: Ord)` holds if...
@@ -823,7 +833,7 @@ forall<T> { WellFormed(BinaryTree<T>) :- WellFormed(T),
 
 ---
 
-# Proving 
+# Putting it all together
 
 * `Implemented(BinaryTree<u32>: Ord)` holds if...
     * `HasImpl(BinaryTree<u32>: Ord)` holds if...
@@ -846,3 +856,304 @@ forall<T> { WellFormed(BinaryTree<T>) :- WellFormed(T),
 
 ---
 
+# Rust declarations
+
+Given a `DeclProgram`, two key tasks:
+
+* ~~Create **program clauses** that define what is *true*~~
+* Create **wellformedness goals** that define what a legal Rust program is
+
+---
+
+# Wellformedness goals for a struct
+
+```rust
+struct BinaryTree<T: Ord> {
+    field1: Type1,
+    field2: Type2,
+}
+```
+
+generates the **goal**
+
+```rust
+forall<T> {
+    if Implemented(T: Ord), WellFormed(T) {
+        WellFormed(Type1),
+        WellFormed(Type2),
+    }
+}
+```
+
+???
+
+* This is a goal we have to prove
+* We can assume where clauses hold, `T` is well-formed
+* Have to show that field types are well-formed
+
+---
+
+# Wellformedness goals for an impl
+
+```rust
+impl<T: Ord> Ord for BinaryTree<T> { ... }
+```
+
+generates the **goal**
+
+```rust
+forall<T> {
+    if Implemented(T: Ord), WellFormed(BinaryTree<T>) {
+        Implemented(BinaryTree<T>: Ord)
+    }
+}
+```
+
+???
+
+* Impl is well-formed if the trait is implemented
+* In other words, if all where clauses on trait are satisfied
+
+---
+
+# Modeling Rust of the future
+
+Use Formality to model future Rust features
+
+* Understand impact of a feature (how fundamental is it)
+* Identify and resolve conflicts before they happen
+
+---
+
+# Perfect derive
+
+```rust
+#[derive(Clone)]
+struct List<T> {
+    data: Rc<T>,
+    next: Option<Rc<List<T>>>
+}
+```
+
+gives
+
+```rust
+impl<T: Clone> Clone for List<T> { ... }
+//    ^^^^^^^ not really necessary
+```
+
+---
+
+# Perfect derive
+
+```rust
+#[derive(Clone)]
+struct List<T> {
+    data: Rc<T>,
+    next: Option<Rc<List<T>>>
+}
+```
+
+better expansion
+
+```rust
+impl<T> Clone for List<T>
+where
+    Rc<T>: Clone,
+    Option<Rc<List<T>>>: Clone,
+```
+
+---
+
+# Perfect derive
+
+Problem: cycles!
+
+Solution: all traits coinductive, not just auto traits like `Send`.
+
+---
+
+# Implied bounds
+
+```rust
+struct BinaryTree<T: Ord> { ... }
+impl<T: Ord> Ord for BinaryTree<T> { ... }
+//    ^^^^^ Why do I have to write this?
+```
+
+---
+
+# Implied bounds
+
+```rust
+struct BinaryTree<T: Ord> { ... }
+impl<T> Ord for BinaryTree<T> { ... }
+```
+
+would desugar to
+
+```rust
+forall<T> {
+    if WellFormed(BinaryTree<T>) {
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^ infer `T: Ord` from this?
+        Implemented(T: Ord)
+    }
+}
+```
+
+---
+
+# Implied bounds
+
+Most obvious idea: Add program clauses from struct definition.
+
+```rust
+struct BinaryTree<T: Ord> { }
+```
+
+add "if and only if" rules like so:
+
+```rust
+forall<T> {
+    WellFormed(BinaryTree<T>) :- WellFormed(T), 
+                                 Implemented(T: Ord),
+                                 Implemented(T: Sized)
+
+    Implemented(T: Ord) :- WellFormed(BinaryTree<T>)
+}
+```
+---
+
+# Implied bounds
+
+In fact, we already have similar rules:
+
+```rust
+trait Ord: Eq { }
+```
+
+you can write `T: Ord` and infer that `T: Eq`...
+
+```rust
+forall<T> {
+    Implemented(T: Ord) :- HasImpl(T: Ord), Implemented(T: Eq)
+
+    Implemented(T: Eq) :- Implemented(T: Ord)
+}
+```
+
+---
+
+# Perfect derive + implied bounds
+
+Problem: unsound when combined with coinduction! 👹
+
+---
+
+# Perfect derive + implied bounds
+
+Given
+
+```rust
+struct X { }
+impl Ord for X { }
+```
+
+can prove `Implemented(X: Eq)` by using the clause 
+
+```rust
+forall<T> { Implemented(T: Eq) :- Implemented(T: Ord) }
+```
+
+* `Implemented(X: Eq)` (by clause above) holds if
+    * `Implemented(X: Ord)` (by clause from trait) holds if
+        * `HasImpl(X: Ord)` ✅
+        * `Implemented(X: Eq)` ✅ -- cycle is ok!
+
+---
+
+# Clauses + Invariants: How Formality models it
+
+The logic layer actually has
+
+* clauses (rules that define what is true)
+* invariants (assertions of form `P ⇒ Q` that should hold)
+
+---
+
+# Clauses + Invariants: How Formality models it
+
+```rust
+trait Ord: Eq { }
+```
+
+gives the **clause**
+
+```rust
+forall<T> {
+    Implemented(T: Ord) :- HasImpl(T: Ord), Implemented(T: Eq)
+}
+```
+
+and the **invariant**
+
+```rust
+Implemented(T: Ord) => Implemented(T: Eq)
+```
+
+---
+
+# Clauses + Invariants: How Formality models it
+
+Invariants are only used to elaborate **hypotheses** when proving an implication like `if H { G }`:
+
+```rust
+if Implemented(T: Ord) {
+    G
+}
+``` 
+
+is equivalent to
+
+```rust
+if Implemented(T: Ord) ∧ Implemented(T: Eq) {
+    G
+}
+```
+
+---
+
+# Sound?
+
+Have to show
+
+* Logic layer: proof rule is sound assuming invariants are accurate
+* Decl layer: invariants generated are accurate
+
+---
+
+# Modeling Rust of the future: summary
+
+Can implement *perfect derive* and *implied bounds* by...
+
+* Extending logic layer to include invariants + coinduction
+
+Matches our intuition:
+
+* Syntax doesn't change at all
+* But a fairly fundamental change nonetheless!
+
+---
+
+# Conclusion
+
+Presented **a-mir-formality**:
+
+* Layered modeling of Rust semantics:
+    * Core logic that is independent of Rust
+    * Semantics of Rust expressed as logical predicates
+    * Currently targeting MIR type system + operational semantics
+* Formality can be used to:
+    * Describe Rust type system with precision
+    * Explore and understand proposed Rust extensions
+    * Provide vocabulary for compiler, tooling to communicate
