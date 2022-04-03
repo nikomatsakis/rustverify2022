@@ -5,7 +5,7 @@ count: false
 # A MIR Formality
 
 .me[.grey[*by* **Nicholas Matsakis**]]
-.citation[`https://github.com/nikomatsakis/rustverify2022`]
+.citation[View slides at `https://nikomatsakis.github.io/rustverify2022/#1`]
 
 ---
 
@@ -328,6 +328,213 @@ Will eventually model Rust's actual solver.
 
 ---
 
+name:goal-definition
+
+```rust
+(Goal ::=
+      Predicate
+      Relation
+      BuiltinGoal)
+(BuiltinGoal ::=
+             (All (Goal ...))
+             (Any (Goal ...))
+             (Implies Hypotheses Goal)
+             (Quantifier KindedVarIds Goal)
+             )
+(Quantifier ::= ForAll Exists)
+(Relation ::= (Parameter RelationOp Parameter))
+(RelationOp ::= == <= >=)
+(Predicate Parameter ::= Term)
+```
+
+.footnote[[Source](https://github.com/nikomatsakis/a-mir-formality/blob/195a04db4d4fb7809df84d97f5899a29f65eb407/src/logic/grammar.rkt#L64-L73)]
+
+---
+
+template:goal-definition
+
+.GoalArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:goal-definition
+
+.PredicateReferenceArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:goal-definition
+
+.PredicateDefinitionArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:goal-definition
+
+.RelationReferenceArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:goal-definition
+
+.RelationDefinitionArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:goal-definition
+
+.BuiltinGoalDefinitionArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+name:solver-definition
+
+```racket
+(define-judgment-form formality-logic
+  #:mode (prove I I I O)
+  #:contract (prove Env Prove/Stacks Goal Env_out)
+
+  ...
+
+  [(prove Env Prove/Stacks Goal_1 Env_out)
+   ------------------------------------------ "prove-any"
+   (prove Env Prove/Stacks (Any (Goal_0 ... Goal_1 Goal_2 ...)) Env_out)
+   ]
+
+  ...
+  )
+```
+
+---
+
+template:solver-definition
+
+.ProveArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveModeArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveContractArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveContractEnvArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveContractStackArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveContractGoalArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveContractEnvOutArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveAnyArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:solver-definition
+
+.ProveGoalIArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+name:prove-clause
+
+```racket
+(define-judgment-form formality-logic
+  #:mode (prove I I I O)
+  #:contract (prove Env Prove/Stacks Goal Env_out)
+
+  ...
+
+  [(not-in-stacks Env Predicate Prove/Stacks)
+   (where (_ ... Clause _ ... ) (env-clauses-for-predicate Env Predicate))
+   (clause-proves Env Prove/Stacks Clause Predicate Env_out)
+   --------------- "prove-clause"
+   (prove Env Prove/Stacks Predicate Env_out)
+   ]
+
+  ...
+  )
+```
+
+---
+
+template:prove-clause
+
+.ProvePredicateArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:prove-clause
+
+.ProveNotInStacksArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:prove-clause
+
+.ProveEnvClausesArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+name:env-clauses-for-predicate
+
+```racket
+(define-metafunction formality-logic
+  ;; Returns all program clauses in the environment that are
+  ;; potentially relevant to solving `Predicate`
+  env-clauses-for-predicate : Env Predicate -> Clauses
+
+  [(env-clauses-for-predicate Env Predicate)
+   ,(let ((clauses-fn (formality-logic-hook-clauses (term any))))
+      (clauses-fn (term Predicate)))
+   (where/error (Hook: any) (env-hook Env))
+   ]
+  )
+```
+
+.footnote[[Source](https://github.com/nikomatsakis/a-mir-formality/blob/195a04db4d4fb7809df84d97f5899a29f65eb407/src/logic/hook.rkt#L20-L25)]
+
+---
+
+template:env-clauses-for-predicate
+
+.EnvClausesArrow[![Arrow](./images/Arrow.png)]
+
+---
+
+template:env-clauses-for-predicate
+
+.EnvClausesScreamFace[😱]
+
+.EnvClausesScreamArrow[![Arrow](./images/Arrow.png)]
+
+---
+
 # ~~Core logic~~
 
 # Rust types
@@ -340,53 +547,11 @@ Defines:
 
 * Grammar of types, lifetimes, and where clauses
 * Subtyping rules
+* Type inference
 
 ---
 
-# Type grammar
-
-Generalized version of Rust types:
-
-```
-Type = RigidType < Parameter ... >
-     | ∀X:WhereClause. Type
-     | ∃X:WhereClause. Type
-     | X
-
-RigidType = StructName
-          | tuple/N
-          | fn/N
-          | ...
-
-Parameter = Type
-          | Lifetime
-```
-
----
-
-# Rigid types
-
-Most Rust types are "rigid types":
-
-* a `Vec<T>` would just be `Vec<T>`
-* a fn pointer like `fn(u8)` would be `fn/1<u8, ()>`
-* a tuple like `(T, U)` would be `tuple/2<T, U)>`
-
----
-
-# ∀ types
-
-∀ types are used for higher-ranked functions and `dyn` values.
-
-* a type like `for<'a> fn(&'a u8)` would be `∀'a. fn/1<&'a u8, ()>`
-
----
-
-# ∃ types
-
-∃ types are used for higher-ranked functions and `dyn` values.
-
-* a type like `dyn Write` would be `∃T:Write. T`
+# Rust types
 
 ---
 
@@ -400,7 +565,99 @@ Most Rust types are "rigid types":
 
 # Rust declarations
 
+Defines the semantics and type rules for most Rust items:
+
+* Struct, enum declarations
+* Traits
+* Impls (inherent, trait)
+* Functions (but no function bodies)
 
 ---
 
 # Rust declarations
+
+Given a set of crates, 
+
+---
+
+# Clauses
+
+Given a set of crates, creates the program clauses that define *what is true*.
+
+Predicates we use:
+
+* **`WellFormed(Ty)`** -- true if the type is well formed
+* **`HasImpl(P0: Trait<P1..Pn>)`** -- true if an impl exists and its where clauses are satisfied
+* **`Implemented(P0: Trait<P1..Pn>)`** -- true if an impl exists and all where clauses declared on the trait are satisfied
+
+---
+
+# Clauses from a struct
+
+```rust
+struct BinaryTree<T: Ord> { }
+```
+
+generates
+
+```rust
+forall<T> {
+    WellFormed(BinaryTree<T>) :-
+        WellFormed(T),
+        Implemented(T: Ord),
+        Implemented(T: Sized)
+}
+```
+
+---
+
+# Clauses from an impl
+
+```rust
+impl<T: Eq> Eq for Vec<T> { }
+```
+
+generates
+
+```rust
+forall<T> {
+    HasImpl(Vec<T>: Eq) :-
+        WellFormed(Vec<T>: Eq),
+        Implemented(T: Eq)
+}
+```
+
+---
+
+# Clauses from a trait
+
+```rust
+trait Eq: PartialEq { }
+```
+
+generates
+
+```rust
+forall<T> {
+    Implemented(T: Eq) :-
+        HasImpl(T: Eq),
+        Implemented(T: PartialEq)
+}
+```
+
+---
+
+# Clauses from an impl
+
+```rust
+impl<T: Eq> Eq for Vec<T> { }
+```
+
+generates
+
+```rust
+forall<T> {
+    HasImpl(Vec<T>: Eq) :-
+        Implemented(T: Eq)
+}
+```
