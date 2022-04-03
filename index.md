@@ -4,8 +4,10 @@ count: false
 
 # A MIR Formality
 
+.formalferris[![Ferris](./images/rustacean-orig-noshadow.svg) ![Black tie](./images/Man_wearing_black_tie.jpg)]
+
 .me[.grey[*by* **Nicholas Matsakis**]]
-.citation[View slides at `https://nikomatsakis.github.io/rustverify2022/#1`]
+.left[.citation[View slides at `https://nikomatsakis.github.io/rustverify2022/` <br/> Tuxedo image by KoeppiK - Own work, CC BY-SA 4.0, [wikimedia url](https://commons.wikimedia.org/w/index.php?curid=85669777)]]
 
 ---
 
